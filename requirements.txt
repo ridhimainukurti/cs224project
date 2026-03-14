@@ -1,0 +1,8 @@
+earthengine-api
+geemap
+pyspark
+pandas
+numpy
+scikit-learn
+matplotlib
+jupyter
