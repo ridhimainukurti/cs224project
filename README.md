@@ -161,9 +161,3 @@ python scripts/member3/randomForest_testing_composites.py
 - There is also a root-level `randomForest_training.py`; prefer `scripts/member3/randomForest_training.py` for the maintained workflow.
 - Run all commands from project root so relative paths resolve correctly.
 
-## Troubleshooting
-
-- `ModuleNotFoundError`: ensure virtual environment is activated and dependencies installed.
-- Spark startup issues: verify Java is installed and available on `PATH`.
-- Missing input files warnings: confirm expected CSV/TIFF files exist under `data/`.
-- Empty dashboard charts: run Member 3 and Member 4 steps first.
