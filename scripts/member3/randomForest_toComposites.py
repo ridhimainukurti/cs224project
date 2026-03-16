@@ -9,19 +9,12 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, DoubleType
 from pyspark.ml import PipelineModel
 
-
-# =========================================================
-# CONFIGURATION
-# =========================================================
-
-# Project root = two levels above this file if stored in scripts/member3/
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_PATH = DATA_DIR / "urban_rf_model"
 OUTPUT_DIR = DATA_DIR / "classified"
 
-# Composite TIFFs to classify
+# composite TIFFs to classify
 COMPOSITE_FILES = [
     "riverside_1990_composite.tif",
     "riverside_2000_composite.tif",
@@ -41,64 +34,88 @@ COMPOSITE_FILES = [
     "las_vegas_2020_composite.tif",
 ]
 
-# Value used for nodata pixels in the output classification raster
+# value used for nodata pixels in the output classification raster
 OUTPUT_NODATA = 255
+URBAN_THRESHOLD = 0.25
 
+# these are model paths 
+# seperate models for different landsat data
+LEGACY_MODEL_PATH = f"{DATA_DIR}/urban_rf_model_legacy"
+MODEL_2020_PATH = f"{DATA_DIR}/urban_rf_model_2020"
 
-# =========================================================
-# SPARK SETUP
-# =========================================================
+def get_model_path_from_filename(tif_name):
+    tif_name = tif_name.lower()
 
-spark = SparkSession.builder \
-    .appName("ApplyUrbanRFToComposites") \
-    .getOrCreate()
+    if "2020" in tif_name:
+        return MODEL_2020_PATH
+    elif any(year in tif_name for year in ["1990", "2000", "2010"]):
+        return LEGACY_MODEL_PATH
+    else:
+        raise ValueError(f"Could not determine model for file: {tif_name}")
 
-spark.sparkContext.setLogLevel("WARN")
-
-print(f"Loading trained model from: {MODEL_PATH}")
-model = PipelineModel.load(str(MODEL_PATH))
-
-
-# =========================================================
-# HELPER FUNCTIONS
-# =========================================================
-
-def compute_ndvi(nir: np.ndarray, red: np.ndarray) -> np.ndarray:
-    """
-    Compute NDVI = (NIR - Red) / (NIR + Red).
-    Uses a safe divide to avoid division-by-zero issues.
-    """
+# compute NVDI (formula)
+def compute_ndvi(nir, red):
     denom = nir + red
     ndvi = np.zeros_like(denom, dtype=np.float32)
 
-    valid = denom != 0
+    # only compute NDVI where denominator is safely away from zero
+    valid = np.abs(denom) > 1e-6
     ndvi[valid] = (nir[valid] - red[valid]) / denom[valid]
 
-    # Keep invalid denominator pixels at 0 for now;
-    # they should already be excluded by the valid mask if inputs are masked.
+    # clip to valid NDVI range
+    ndvi = np.clip(ndvi, -1.0, 1.0)
+
     return ndvi
 
+# helps debug band values before classification 
+def print_band_stats(name, arr, valid_mask):
+    vals = arr[valid_mask]
+    if len(vals) == 0:
+        print(f"{name}: no valid pixels")
+        return
+    print(
+        f"{name}: min={np.nanmin(vals):.4f}, "
+        f"max={np.nanmax(vals):.4f}, "
+        f"mean={np.nanmean(vals):.4f}, "
+        f"std={np.nanstd(vals):.4f}"
+    )
 
-def classify_composite(tif_path: Path, output_path: Path) -> None:
-    """
-    Read a 4-band composite GeoTIFF, compute NDVI, apply the saved Spark
-    Random Forest model, then write a 1-band classification GeoTIFF.
-    """
-    print(f"\n=== Classifying: {tif_path.name} ===")
+# rescale reflectance if tiff values look to large 
+def maybe_rescale_reflectance(arr, valid_mask):
+    vals = arr[valid_mask]
+    if len(vals) == 0:
+        return arr
+
+    # crude safeguard in case a TIFF is scaled 0-10000 instead of ~0-1
+    if np.nanmax(vals) > 2.0:
+        print("Detected large reflectance values; rescaling by 10000.")
+        return arr / 10000.0
+
+    return arr
+
+# classify one compositve tf 
+# laods the correct model for the year, reads the 4-band, computes NVDI, predicts urban proability, writes classification
+def classify_composite(tif_name):
+    tif_path = f"{DATA_DIR}/{tif_name}"
+    output_name = tif_name.replace("_composite.tif", "_classification.tif")
+    output_path = f"{output_dir}/{output_name}"
+
+    print(f"\n=== Classifying: {tif_name} ===")
+
+    # load correct model for this file 
+    model_path = get_model_path_from_filename(tif_name)
+    print(f"Using model: {model_path}")
+    model = PipelineModel.load(model_path)
 
     with rasterio.open(tif_path) as src:
-        # Read as masked arrays so we can exclude invalid pixels
-        # Assumes band order: red, green, blue, nir
+        # assumes band order: red, green, blue, nir
         red = src.read(1, masked=True).astype("float32")
         green = src.read(2, masked=True).astype("float32")
         blue = src.read(3, masked=True).astype("float32")
         nir = src.read(4, masked=True).astype("float32")
 
         height, width = red.shape
-        print(f"Raster shape: {height} x {width}")
 
-        # Build a valid-pixel mask:
-        # pixel is valid only if all 4 bands are unmasked and finite
         valid_mask = (
             ~red.mask & ~green.mask & ~blue.mask & ~nir.mask &
             np.isfinite(red.filled(np.nan)) &
@@ -109,28 +126,51 @@ def classify_composite(tif_path: Path, output_path: Path) -> None:
 
         valid_count = int(valid_mask.sum())
         total_count = height * width
-        print(f"Valid pixels: {valid_count} / {total_count}")
+        valid_pct = 100.0 * valid_count / total_count
+
+        print(f"Raster shape: {height} x {width}")
+        print(f"Valid pixels: {valid_count} / {total_count} ({valid_pct:.2f}%)")
 
         if valid_count == 0:
-            raise ValueError(f"No valid pixels found in {tif_path.name}")
+            print("No valid pixels. Skipping.")
+            return
 
-        # Convert masked arrays to normal arrays
-        red_data = red.filled(np.nan)
-        green_data = green.filled(np.nan)
-        blue_data = blue.filled(np.nan)
-        nir_data = nir.filled(np.nan)
+        red_data = maybe_rescale_reflectance(red.filled(np.nan), valid_mask)
+        green_data = maybe_rescale_reflectance(green.filled(np.nan), valid_mask)
+        blue_data = maybe_rescale_reflectance(blue.filled(np.nan), valid_mask)
+        nir_data = maybe_rescale_reflectance(nir.filled(np.nan), valid_mask)
 
-        # Compute NDVI
+        red_data = np.maximum(red_data, 0.0)
+        green_data = np.maximum(green_data, 0.0)
+        blue_data = np.maximum(blue_data, 0.0)
+        nir_data = np.maximum(nir_data, 0.0)
+
+        print_band_stats("Red", red_data, valid_mask)
+        print_band_stats("Green", green_data, valid_mask)
+        print_band_stats("Blue", blue_data, valid_mask)
+        print_band_stats("NIR", nir_data, valid_mask)
+
+        # compute NVDI and print its stats 
         ndvi_data = compute_ndvi(nir_data, red_data)
+        print_band_stats("NDVI", ndvi_data, valid_mask)
 
-        # Extract only valid pixels and flatten them into rows
-        red_vals = red_data[valid_mask].astype(np.float64)
-        green_vals = green_data[valid_mask].astype(np.float64)
-        blue_vals = blue_data[valid_mask].astype(np.float64)
-        nir_vals = nir_data[valid_mask].astype(np.float64)
-        ndvi_vals = ndvi_data[valid_mask].astype(np.float64)
+        # extract only valid pixel values from each vand 
+        red_vals = red_data[valid_mask]
+        green_vals = green_data[valid_mask]
+        blue_vals = blue_data[valid_mask]
+        nir_vals = nir_data[valid_mask]
+        ndvi_vals = ndvi_data[valid_mask]
 
-        rows = list(zip(red_vals, green_vals, blue_vals, nir_vals, ndvi_vals))
+        rows = [
+            (
+                float(r),
+                float(g),
+                float(b),
+                float(n),
+                float(nd)
+            )
+            for r, g, b, n, nd in zip(red_vals, green_vals, blue_vals, nir_vals, ndvi_vals)
+        ]
 
         schema = StructType([
             StructField("red", DoubleType(), False),
@@ -142,19 +182,31 @@ def classify_composite(tif_path: Path, output_path: Path) -> None:
 
         pixel_df = spark.createDataFrame(rows, schema=schema)
 
-        # Apply the saved pipeline model
-        predictions = model.transform(pixel_df).select("prediction")
+        # run model prediction 
+        # use probabilities instead of default hard prediction
+        predictions = model.transform(pixel_df).select("probability")
+        prediction_rows = predictions.collect()
 
-        prediction_values = np.array(
-            predictions.rdd.map(lambda r: int(r["prediction"])).collect(),
-            dtype=np.uint8
+        urban_probs = np.array(
+            [float(r["probability"][1]) for r in prediction_rows],
+            dtype=np.float32
         )
 
-        # Prepare output raster, fill invalid pixels with nodata
+        prediction_values = (urban_probs >= URBAN_THRESHOLD).astype(np.uint8)
+
+        print(
+            f"Urban probability stats: "
+            f"min={urban_probs.min():.4f}, "
+            f"max={urban_probs.max():.4f}, "
+            f"mean={urban_probs.mean():.4f}, "
+            f"std={urban_probs.std():.4f}"
+        )
+        print(f"Using urban threshold: {URBAN_THRESHOLD}")
+
+        # start output raster + write predictions 
         classified = np.full((height, width), OUTPUT_NODATA, dtype=np.uint8)
         classified[valid_mask] = prediction_values
 
-        # Write output GeoTIFF
         profile = src.profile.copy()
         profile.update(
             count=1,
@@ -162,37 +214,21 @@ def classify_composite(tif_path: Path, output_path: Path) -> None:
             nodata=OUTPUT_NODATA,
             compress="lzw"
         )
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
+        # save the classified raster to disk 
         with rasterio.open(output_path, "w", **profile) as dst:
             dst.write(classified, 1)
 
         urban_pixels = int((classified == 1).sum())
         nonurban_pixels = int((classified == 0).sum())
         nodata_pixels = int((classified == OUTPUT_NODATA).sum())
+        nodata_pct = 100.0 * nodata_pixels / total_count
 
         print(f"Saved: {output_path}")
         print(f"Urban pixels     : {urban_pixels}")
         print(f"Non-urban pixels : {nonurban_pixels}")
         print(f"Nodata pixels    : {nodata_pixels}")
+        print(f"Nodata percent   : {nodata_pct:.2f}%")
 
-
-# =========================================================
-# MAIN LOOP
-# =========================================================
-
-for filename in COMPOSITE_FILES:
-    input_path = DATA_DIR / filename
-
-    if not input_path.exists():
-        print(f"Skipping missing file: {input_path}")
-        continue
-
-    output_name = filename.replace("_composite.tif", "_classification.tif")
-    output_path = OUTPUT_DIR / output_name
-
-    classify_composite(input_path, output_path)
-
-print("\nAll requested composites processed.")
-spark.stop()
+# classify all composite files 
+for tif_name in COMPOSITE_FILES:
+    classify_composite(tif_name)

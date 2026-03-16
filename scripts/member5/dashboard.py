@@ -1155,7 +1155,7 @@ def page_home():
         """, unsafe_allow_html=True)
 
     with hero_right:
-        preview = classification_pil("las_vegas", 2020, width=700)
+        preview = classification_pil("riverside", 2000, width=700)
         if preview is not None:
             st.markdown('<div class="hero-image-frame">', unsafe_allow_html=True)
             st.image(preview, use_container_width=True)
@@ -1195,10 +1195,10 @@ def page_home():
             for col, city in zip(summary_cols, CITIES):
                 city_data = df[df["city"] == city].sort_values("year")
                 a1990 = city_data.loc[city_data["year"] == 1990, "urban_area_km2"].values
-                a2010 = city_data.loc[city_data["year"] == 2010, "urban_area_km2"].values
+                a2020 = city_data.loc[city_data["year"] == 2020, "urban_area_km2"].values
                 with col:
-                    if len(a1990) and len(a2010) and pd.notna(a1990[0]) and pd.notna(a2010[0]):
-                        pct = round(((a2010[0] - a1990[0]) / a1990[0]) * 100, 1)
+                    if len(a1990) and len(a2020) and pd.notna(a1990[0]) and pd.notna(a2020[0]):
+                        pct = round(((a2020[0] - a1990[0]) / a1990[0]) * 100, 1)
                         st.markdown(f"""
                         <div class="metric-card">
                             <div style="color:#000000; font-size:1.1em; font-weight:700;">
@@ -1207,7 +1207,7 @@ def page_home():
                             <div class="metric-value" style="color:#000000;">{pct:+.0f}%</div>
                             <div class="metric-label">urban growth (1990–2010)</div>
                             <div style="color:#000000; font-size:0.78em; margin-top:6px;">
-                                {a2010[0]:.0f} km² in 2010
+                                {a2020[0]:.0f} km² in 2020
                             </div>
                         </div>
                         """, unsafe_allow_html=True)

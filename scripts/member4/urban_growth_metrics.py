@@ -12,9 +12,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CLASSIFIED_DIR = PROJECT_ROOT / "data" / "classified"
 OUTPUT_DIR     = PROJECT_ROOT / "data"
-CHARTS_DIR     = PROJECT_ROOT / "data" / "charts"
+CHARTS_DIR     = PROJECT_ROOT / "data" / "chartsNew"
 
 CHARTS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Human-readable city names used in labels and UI
+CITY_LABELS = {
+    "riverside": "Riverside",
+    "phoenix":   "Phoenix",
+    "las_vegas": "Las Vegas",
+    "austin":    "Austin",
+}
+
+# Per-city brand colors used consistently across charts and cards
+CITY_COLORS = {
+    "riverside": "#2F6F4E",
+    "phoenix":   "#E76F51",
+    "las_vegas": "#4C9BE8",
+    "austin":    "#7A9E7E",
+}
 
 # Cities and Years to process, these HAVE to match the filenames produced by Member 3
 CITIES = ["riverside", "phoenix", "las_vegas", "austin"]
