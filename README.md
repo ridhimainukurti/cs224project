@@ -8,12 +8,13 @@ Ananya Sood, University of California, Riverside, Group: Pontiac Bandits, Studen
 Ridhima Inukurti, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862355715
 
 # Author Contributions
-Build Landsat composites in Google Earth Engine (GEE) - Ridhima Inukurti
-Generate Training Samples in GEE - Ananya Sood
-Train Spark Random Forest Model - Ridhima Inukurti & Ananya Sood
-Apply Model to all Composites and Export Classification Rasters - Ridhima Inukurti & Ananya Sood
-Compute Growth Metrics and Charts - Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig
-Building An Interactive Website - Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig 
+
+- **Build Landsat composites in Google Earth Engine (GEE)** — Ridhima Inukurti  
+- **Generate Training Samples in GEE** — Ananya Sood  
+- **Train Spark Random Forest Model** — Ridhima Inukurti & Ananya Sood  
+- **Apply Model to all Composites and Export Classification Rasters** — Ridhima Inukurti & Ananya Sood  
+- **Compute Growth Metrics and Charts** — Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig  
+- **Build Interactive Website** — Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig
 
 This repository contains a full pipeline for urban expansion analysis across four cities and four decades:
 
