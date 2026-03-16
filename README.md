@@ -16,6 +16,7 @@ Ridhima Inukurti, University of California, Riverside, Group: Pontiac Bandits, S
 - **Compute Growth Metrics and Charts** — Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig  
 - **Build Interactive Website** — Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig
 
+# Repo Description 
 This repository contains a full pipeline for urban expansion analysis across four cities and four decades:
 
 - Cities: Riverside, Phoenix, Las Vegas, Austin
