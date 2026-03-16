@@ -437,36 +437,87 @@ def chart_growth_slopegraph(df: pd.DataFrame, active_cities: list[str]):
     for city in active_cities:
         city_data = df[df["city"] == city].sort_values("year")
         start = city_data.loc[city_data["year"] == 1990, "urban_area_km2"].values
-        end   = city_data.loc[city_data["year"] == 2020, "urban_area_km2"].values
+        end = city_data.loc[city_data["year"] == 2020, "urban_area_km2"].values
         if len(start) and len(end) and pd.notna(start[0]) and pd.notna(end[0]):
             max_val = max(max_val, float(start[0]), float(end[0]))
+
+    # label nudges in points so text doesn't collide with markers/lines
+    left_label_offsets = {
+        "las_vegas": (-10, 2),
+        "phoenix": (-10, 0),
+        "riverside": (-10, 1),
+        "austin": (-10, 0),
+    }
+
+    right_label_offsets = {
+        "las_vegas": (8, 0),
+        "phoenix": (8, 0),
+        "riverside": (8, 0),
+        "austin": (8, 0),
+    }
 
     for city in active_cities:
         city_data = df[df["city"] == city].sort_values("year")
         start = city_data.loc[city_data["year"] == 1990, "urban_area_km2"].values
-        end   = city_data.loc[city_data["year"] == 2020, "urban_area_km2"].values
+        end = city_data.loc[city_data["year"] == 2020, "urban_area_km2"].values
         if not (len(start) and len(end) and pd.notna(start[0]) and pd.notna(end[0])):
             continue
 
-        y     = [float(start[0]), float(end[0])]
+        y = [float(start[0]), float(end[0])]
         color = CITY_COLORS.get(city, THEME["secondary"])
 
-        ax.plot(x_pos, y, color=color, linewidth=3, alpha=0.95)
-        ax.scatter(x_pos, y, s=90, color=color, edgecolors=THEME["card"], linewidths=1.5, zorder=3)
+        ax.plot(x_pos, y, color=color, linewidth=3, alpha=0.95, zorder=2)
+        ax.scatter(
+            x_pos, y,
+            s=90,
+            color=color,
+            edgecolors=THEME["card"],
+            linewidths=1.5,
+            zorder=3
+        )
 
-        # left side with city name + value + right side with just the end value
-        ax.text(-0.03, y[0], f"{CITY_LABELS[city]}  {y[0]:.0f}", ha="right", va="center",
-                fontsize=9, color=THEME["text"])
-        ax.text(1.03, y[1], f"{y[1]:.0f}", ha="left", va="center",
-                fontsize=9, color=color, fontweight="bold")
+        lx, ly = left_label_offsets.get(city, (-10, 0))
+        rx, ry = right_label_offsets.get(city, (8, 0))
 
-    ax.set_xlim(-0.2, 1.2)
+        # left side: city name + start value
+        ax.annotate(
+            f"{CITY_LABELS[city]}  {y[0]:.0f}",
+            xy=(x_pos[0], y[0]),
+            xytext=(lx, ly),
+            textcoords="offset points",
+            ha="right",
+            va="center",
+            fontsize=9,
+            color=THEME["text"],
+            zorder=4
+        )
+
+        # right side: end value
+        ax.annotate(
+            f"{y[1]:.0f}",
+            xy=(x_pos[1], y[1]),
+            xytext=(rx, ry),
+            textcoords="offset points",
+            ha="left",
+            va="center",
+            fontsize=9,
+            color=color,
+            fontweight="bold",
+            zorder=4
+        )
+
+    ax.set_xlim(-0.28, 1.20)
     ax.set_ylim(0, max_val * 1.12 if max_val else 1)
     ax.set_xticks(x_pos)
     ax.set_xticklabels([str(y) for y in years_to_show], fontsize=10, color=THEME["muted"])
     ax.set_ylabel("Urban Area (km²)", fontsize=10, color=THEME["muted"])
-    ax.set_title("1990 → 2020 Growth Snapshot", fontsize=14, fontweight="semibold",
-                 color=THEME["text"], pad=12)
+    ax.set_title(
+        "1990 → 2020 Growth Snapshot",
+        fontsize=14,
+        fontweight="semibold",
+        color=THEME["text"],
+        pad=12
+    )
 
     ax.grid(axis="y", alpha=0.10, color=THEME["border"])
     ax.grid(axis="x", visible=False)
