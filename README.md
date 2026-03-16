@@ -1,5 +1,5 @@
 # Project Title: Urban Expansion Mapping
-# Group Name: Potniac Bandits 
+## Group Name: Potniac Bandits 
 
 - **Deepthi Dayanand, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862637806**
 - **Ashish Kulkarni, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862637808**
@@ -7,7 +7,7 @@
 - **Ananya Sood, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862359197**
 - **Ridhima Inukurti, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862355715**
 
-# Author Contributions
+## Author Contributions
 
 - **Build Landsat composites in Google Earth Engine (GEE)** — Ridhima Inukurti  
 - **Generate Training Samples in GEE** — Ananya Sood  
