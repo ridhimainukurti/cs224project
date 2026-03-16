@@ -1,4 +1,18 @@
-# Urban Expansion Mapping (CS224 Project)
+# Project Title: Urban Expansion Mapping
+# Group Name: Potniac Bandits 
+# Deepthi Dayanand, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862637806
+# Ashish Kulkarni, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862637808
+# Abhijith A Nadig, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862546804
+# Ananya Sood, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862359197
+# Ridhima Inukurti, University of California, Riverside, Group: Pontiac Bandits, Student ID: 862355715
+
+# Author Contributions
+Build Landsat composites in Google Earth Engine (GEE) - Ridhima Inukurti
+Generate Training Samples in GEE - Ananya Sood
+Train Spark Random Forest Model - Ridhima Inukurti & Ananya Sood
+Apply Model to all Composites and Export Classification Rasters - Ridhima Inukurti & Ananya Sood
+Compute Growth Metrics and Charts - Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig
+Building An Interactive Website - Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig 
 
 This repository contains a full pipeline for urban expansion analysis across four cities and four decades:
 
@@ -12,12 +26,13 @@ This repository contains a full pipeline for urban expansion analysis across fou
 ## Project Pipeline
 
 1. Build Landsat composites in Google Earth Engine (GEE)
-2. Generate training samples in GEE
-3. Train Spark Random Forest model
-4. Apply model to all composites and export classification rasters
-5. Compute growth metrics and charts
-6. Explore results in dashboard
+2. Generate Training Samples in GEE
+3. Train Spark Random Forest Model
+4. Apply Model to all Composites and Export Classification Rasters
+5. Compute Growth Metrics and Charts
+6. Building An Interactive Website
 
+ 
 ## Repository Layout
 
 - `data/`
@@ -33,7 +48,7 @@ This repository contains a full pipeline for urban expansion analysis across fou
 - `scripts/member4/`
 	- Urban growth metrics and analysis charts
 - `scripts/member5/`
-	- Streamlit dashboard
+	- Streamlit dashboard 
 
 ## Prerequisites
 
