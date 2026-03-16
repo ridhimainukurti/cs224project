@@ -14,7 +14,7 @@ Ridhima Inukurti, University of California, Riverside, Group: Pontiac Bandits, S
 - **Train Spark Random Forest Model** — Ridhima Inukurti & Ananya Sood  
 - **Apply Model to all Composites and Export Classification Rasters** — Ridhima Inukurti & Ananya Sood  
 - **Compute Growth Metrics and Charts** — Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig  
-- **Build Interactive Website** — Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig
+- **Build The Interactive Website** — Deepthi Dayanand, Ashish Kulkarni & Abhijith A Nadig
 
 ## Repo Description 
 This repository contains a full pipeline for urban expansion analysis across four cities and four decades:
@@ -33,7 +33,7 @@ This repository contains a full pipeline for urban expansion analysis across fou
 3. Train Spark Random Forest Model
 4. Apply Model to all Composites and Export Classification Rasters
 5. Compute Growth Metrics and Charts
-6. Building An Interactive Website
+6. Build The Interactive Website
 
  
 ## Repository Layout
