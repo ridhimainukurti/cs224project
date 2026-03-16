@@ -1,42 +1,13 @@
-"""
-Member 4: Urban Growth Metrics & Analysis Lead
-===============================================
-Reads the classified GeoTIFF outputs produced by Member 3 (one per city per year)
-and computes the following statistics:
-
-  - Urban area in km² for each city / year
-  - Absolute growth (km²) between consecutive decades
-  - Percentage growth between consecutive decades
-
-Also produces three publication-ready charts and a short written analysis.
-
-Outputs
--------
-  data/urban_growth_metrics.csv     — full metrics table
-  data/charts/urban_area_over_time.png
-  data/charts/city_comparison_growth.png
-  data/charts/urban_area_by_city_year.png
-
-Usage
------
-  cd <project_root>
-  python scripts/member4/urban_growth_metrics.py
-"""
-
 from pathlib import Path
 
 import matplotlib
-matplotlib.use("Agg")   # Non-interactive backend — must be set before importing pyplot
+matplotlib.use("Agg") 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import rasterio
 
-# =========================================================
-# CONFIGURATION
-# =========================================================
-
-# Navigate two levels up from scripts/member4/ to reach the project root
+# Go two levels up from scripts/member4/ (to get to project root)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CLASSIFIED_DIR = PROJECT_ROOT / "data" / "classified"
@@ -45,58 +16,30 @@ CHARTS_DIR     = PROJECT_ROOT / "data" / "charts"
 
 CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Cities and years to process — must match the filenames produced by Member 3
+# Cities and Years to process, these HAVE to match the filenames produced by Member 3
 CITIES = ["riverside", "phoenix", "las_vegas", "austin"]
 YEARS  = [1990, 2000, 2010, 2020]
 
-# Landsat spatial resolution: 30 m × 30 m = 900 m² per pixel
+# Landsat Spatial Resolution (math is: 30 m × 30 m = 900 m² per pixel)
 PIXEL_AREA_M2  = 900
-PIXEL_AREA_KM2 = PIXEL_AREA_M2 / 1_000_000    # 0.0009 km²
+PIXEL_AREA_KM2 = PIXEL_AREA_M2 / 1_000_000
 
-# Value written to nodata pixels by Member 3's classifier
+# nodata pixels by Member 3's classifier
 NODATA_VALUE = 255
 
-# Human-readable city names for chart labels
-CITY_LABELS = {
-    "riverside": "Riverside",
-    "phoenix":   "Phoenix",
-    "las_vegas": "Las Vegas",
-    "austin":    "Austin",
-}
-
-# Consistent color palette — reused across all charts
-CITY_COLORS = {
-    "riverside": "#2196F3",
-    "phoenix":   "#FF5722",
-    "las_vegas": "#9C27B0",
-    "austin":    "#4CAF50",
-}
-
-
-# =========================================================
-# STEP 1 — Count urban pixels and convert to area
-# =========================================================
-
+# Taking the Urban Pixels --> Area
+# Essentially opens the classification and then return number of urban ones
 def count_urban_pixels(tif_path: Path) -> int:
-    """
-    Open a single-band classification GeoTIFF and return the number of
-    pixels whose value equals 1 (urban).
-    """
     with rasterio.open(tif_path) as src:
         data = src.read(1)   # Band 1 contains the classification labels
     return int(np.sum(data == 1))
 
-
+# pixels --> area (km2)
 def pixels_to_km2(pixel_count: int) -> float:
-    """Convert a pixel count to area in km², rounded to 2 decimal places."""
     return round(pixel_count * PIXEL_AREA_KM2, 2)
 
-
-# =========================================================
-# STEP 2 — Build base metrics table
-# =========================================================
-
-print("=== Computing Urban Area ===")
+# This is Our Base Metrics Table
+print("Computing Urban Area")
 records = []
 
 for city in CITIES:
@@ -127,16 +70,11 @@ for city in CITIES:
 
 metrics_df = pd.DataFrame(records)
 
-
-# =========================================================
-# STEP 3 — Calculate growth between consecutive decades
-# =========================================================
-
-print("\n=== Calculating Growth ===")
+# This is where we calculate growth (through the years)
+print("\nCalculating Growth")
 growth_rows = []
 
 for city in CITIES:
-    # Sort by year so growth is always computed forward in time
     city_df = (
         metrics_df[metrics_df["city"] == city]
         .sort_values("year")
@@ -155,9 +93,9 @@ for city in CITIES:
             prev_area = city_df.loc[i - 1, "urban_area_km2"]
 
             if prev_area is not None and prev_area > 0 and area is not None:
-                # Absolute growth in km²
+                # growth in km²
                 growth_km2 = round(area - prev_area, 2)
-                # Percentage growth relative to the previous decade
+                # Percentage growth compared to the previous decade
                 growth_pct = round(((area - prev_area) / prev_area) * 100, 1)
             else:
                 growth_km2 = None
@@ -173,27 +111,22 @@ for city in CITIES:
 
 growth_df = pd.DataFrame(growth_rows)
 
-# Add a human-readable display column for percentage growth
+# Display column for percentage growth
 growth_df["growth_pct_display"] = growth_df["growth_pct"].apply(
     lambda x: f"{x:.1f}%" if pd.notna(x) else "—"
 )
 
-# ── Print full table ─────────────────────────────────────────────────────────
-print("\n=== Urban Growth Metrics Table ===")
+# Our Full Column
+print("\nUrban Growth Metrics Table")
 print(growth_df[["city", "year", "urban_area_km2", "growth_km2", "growth_pct_display"]]
       .to_string(index=False))
 
-# ── Export CSV ───────────────────────────────────────────────────────────────
+# CSV Export
 metrics_csv_path = OUTPUT_DIR / "urban_growth_metrics.csv"
 growth_df.to_csv(metrics_csv_path, index=False)
 print(f"\nMetrics saved to: {metrics_csv_path}")
 
-
-# =========================================================
-# STEP 4 — Charts
-# =========================================================
-
-# ── Chart 1: Urban Area vs Year (line chart, one line per city) ─────────────
+# First Chart: Urban Area vs. Year (line chart)
 fig1, ax1 = plt.subplots(figsize=(10, 6))
 
 for city in CITIES:
@@ -208,7 +141,6 @@ for city in CITIES:
         color=CITY_COLORS[city],
     )
 
-    # Annotate the 2020 endpoint with its area value
     last = city_data.iloc[-1]
     if pd.notna(last["urban_area_km2"]):
         ax1.annotate(
@@ -233,8 +165,7 @@ fig1.savefig(chart1_path, dpi=150)
 plt.close(fig1)
 print(f"Chart saved: {chart1_path}")
 
-
-# ── Chart 2: City Comparison — total growth 1990→2020 (bar chart) ───────────
+# Second Chart: Comaprison of Cities (1990->2020)
 comparison_data = []
 
 for city in CITIES:
@@ -265,7 +196,6 @@ if not comp_df.empty:
         linewidth=0.5,
     )
 
-    # Label each bar with its percentage growth above it
     for bar, (_, row) in zip(bars, comp_df.iterrows()):
         ax2.text(
             bar.get_x() + bar.get_width() / 2,
@@ -288,8 +218,7 @@ fig2.savefig(chart2_path, dpi=150)
 plt.close(fig2)
 print(f"Chart saved: {chart2_path}")
 
-
-# ── Chart 3: Grouped bar — urban area for each city across all years ──────────
+# Third Chart: Grouped Bar (Urban Areas for the Cities (all years))
 fig3, ax3 = plt.subplots(figsize=(12, 6))
 
 x          = np.arange(len(CITIES))
@@ -321,12 +250,7 @@ fig3.savefig(chart3_path, dpi=150)
 plt.close(fig3)
 print(f"Chart saved: {chart3_path}")
 
-
-# =========================================================
-# STEP 5 — Short analysis
-# =========================================================
-
-print("\n=== Short Analysis ===")
+print("\nShort Analysis")
 
 # Which city grew fastest by percentage?
 if not comp_df.empty:
