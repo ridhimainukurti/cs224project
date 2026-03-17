@@ -15,9 +15,9 @@ from PIL import Image, ImageDraw
 # PATHS & CONSTANTS
 # Go two levels up from scripts/member5/ to reach the project root
 PROJECT_ROOT   = Path(__file__).resolve().parents[2]
-CLASSIFIED_DIR = PROJECT_ROOT / "data" / "classified"
+CLASSIFIED_DIR = PROJECT_ROOT / "data" / "classifiedNew"
 METRICS_CSV    = PROJECT_ROOT / "data" / "urban_growth_metrics.csv"
-CHARTS_DIR     = PROJECT_ROOT / "data" / "charts"
+CHARTS_DIR     = PROJECT_ROOT / "data" / "chartsFinal"
 
 CITIES = ["riverside", "phoenix", "las_vegas", "austin"]
 YEARS  = [1990, 2000, 2010, 2020]
