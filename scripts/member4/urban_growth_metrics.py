@@ -10,9 +10,9 @@ import rasterio
 # Go two levels up from scripts/member4/ (to get to project root)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-CLASSIFIED_DIR = PROJECT_ROOT / "data" / "classifiedNew"
+CLASSIFIED_DIR = PROJECT_ROOT / "data" / "classified"
 OUTPUT_DIR     = PROJECT_ROOT / "data"
-CHARTS_DIR     = PROJECT_ROOT / "data" / "chartsFinal"
+CHARTS_DIR     = PROJECT_ROOT / "data" / "charts"
 
 CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 

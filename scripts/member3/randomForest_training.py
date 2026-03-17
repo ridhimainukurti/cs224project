@@ -11,76 +11,86 @@ spark = SparkSession.builder \
     .appName("UrbanExpansionRandomForest") \
     .getOrCreate()
 
-file_riverside_1990 = "riverside_1990_training_samples.csv"
-file_riverside_2000 = "riverside_2000_training_samples.csv"
-file_riverside_2010 = "riverside_2010_training_samples.csv"
-file_riverside_2020 = "riverside_2020_training_samples.csv"
-file_austin_2020 = "austin_2020_training_samples.csv"
+# load the files 
+file_riverside_1990 = "/content/drive/MyDrive/urban_expansion_exports/riverside_1990_training_samples.csv"
+file_riverside_2000 = "/content/drive/MyDrive/urban_expansion_exports/riverside_2000_training_samples.csv"
+file_riverside_2010 = "/content/drive/MyDrive/urban_expansion_exports/riverside_2010_training_samples.csv"
+file_riverside_2020 = "/content/drive/MyDrive/urban_expansion_exports/riverside_2020_training_samples.csv"
 
-# reading the csv files for training 
-df_1990 = spark.read.csv(file_riverside_1990, header=True, inferSchema=True)
-df_2000 = spark.read.csv(file_riverside_2000, header=True, inferSchema=True)
-df_2010 = spark.read.csv(file_riverside_2010, header=True, inferSchema=True)
-df_2020 = spark.read.csv(file_riverside_2020, header=True, inferSchema=True)
+# optional holdout / inspection only
+file_austin_2020 = "/content/drive/MyDrive/urban_expansion_exports/austin_2020_training_samples.csv"
+
+df_riverside_1990 = spark.read.csv(file_riverside_1990, header=True, inferSchema=True)
+df_riverside_2000 = spark.read.csv(file_riverside_2000, header=True, inferSchema=True)
+df_riverside_2010 = spark.read.csv(file_riverside_2010, header=True, inferSchema=True)
+df_riverside_2020 = spark.read.csv(file_riverside_2020, header=True, inferSchema=True)
 df_austin_2020 = spark.read.csv(file_austin_2020, header=True, inferSchema=True)
 
-df = (
-    df_1990
-    .unionByName(df_2000)
-    .unionByName(df_2010)
-    .unionByName(df_2020)
-    .unionByName(df_austin_2020)
-)
-
-# print schema to confirm column names and data types 
-print("=== Schema ===")
-df.printSchema()
-
-# show a few example rows 
-print("=== Sample Rows ===")
-df.show(5, truncate=False)
-
-# print the total number of raw rows before cleaning 
-print("=== Raw Row Count ===")
-print(df.count())
-
-# define features and labels 
+# defining features and labels 
 feature_cols = ["red", "green", "blue", "nir", "ndvi"]
 target_col = "label"
 required_cols = feature_cols + [target_col]
 
-# clean the data 
-df_clean = df.dropna(subset=required_cols)
+# helper for cleaning the data 
+def clean_df(df_in, city_name=None, year_val=None):
+    df_out = df_in
 
-for c in feature_cols:
-    df_clean = df_clean.withColumn(c, col(c).cast("double"))
+    # standardize city/year if missing or inconsistent
+    if city_name is not None and "city" in df_out.columns:
+        df_out = df_out.withColumn("city", lit(city_name))
+    if year_val is not None and "year" in df_out.columns:
+        df_out = df_out.withColumn("year", lit(year_val))
 
-df_clean = df_clean.withColumn(target_col, col(target_col).cast("double"))
-df_clean = df_clean.dropna(subset=required_cols)
-df_clean = df_clean.dropDuplicates()
+    # drop rows missing required columns
+    df_out = df_out.dropna(subset=required_cols)
+
+    # cast features
+    for c in feature_cols:
+        df_out = df_out.withColumn(c, col(c).cast("double"))
+
+    # cast label as integer-like numeric
+    df_out = df_out.withColumn(target_col, col(target_col).cast("double"))
+
+    # keep only binary labels 0/1
+    df_out = df_out.filter(col(target_col).isin([0.0, 1.0]))
+
+    # drop remaining nulls / duplicates
+    df_out = df_out.dropna(subset=required_cols)
+    df_out = df_out.dropDuplicates()
+
+    return df_out
+
+df_riverside_1990 = clean_df(df_riverside_1990, "riverside", 1990)
+df_riverside_2000 = clean_df(df_riverside_2000, "riverside", 2000)
+df_riverside_2010 = clean_df(df_riverside_2010, "riverside", 2010)
+df_riverside_2020 = clean_df(df_riverside_2020, "riverside", 2020)
+df_austin_2020 = clean_df(df_austin_2020, "austin", 2020)
+
+# combined inspection dataframe 
+df_all = (
+    df_riverside_1990
+    .unionByName(df_riverside_2000)
+    .unionByName(df_riverside_2010)
+    .unionByName(df_riverside_2020)
+    .unionByName(df_austin_2020)
+)
+
+print("=== Schema ===")
+df_all.printSchema()
+
+print("=== Sample Rows ===")
+df_all.show(5, truncate=False)
 
 print("=== Cleaned Row Count ===")
-print(df_clean.count())
-
-# summaries to verify whether classes are balanced
-print("=== Label Distribution ===")
-df_clean.groupBy("label").count().orderBy("label").show()
-
-print("=== Label Distribution by Year ===")
-df_clean.groupBy("year", "label").count().orderBy("year", "label").show()
+print(df_all.count())
 
 print("=== Label Distribution by City and Year ===")
-df_clean.groupBy("city", "year", "label").count().orderBy("city", "year", "label").show()
+df_all.groupBy("city", "year", "label").count().orderBy("city", "year", "label").show()
 
-print("=== Subclass Distribution by Year ===")
-if "subclass" in df_clean.columns:
-    df_clean.groupBy("year", "subclass").count().orderBy("year", "subclass").show()
-
-# print descriptive statistics for each spectral feature by year 
-# useful for checking wehther feature ranges differ alot 
+# optional feature statistics 
 for yr in [1990, 2000, 2010, 2020]:
-    print(f"=== Feature Stats for Year {yr} ===")
-    yr_df = df_clean.filter(col("year") == yr)
+    print(f"=== Riverside Feature Stats for Year {yr} ===")
+    yr_df = df_all.filter((col("city") == "riverside") & (col("year") == yr))
     yr_df.select(
         mean("red").alias("red_mean"),
         stddev("red").alias("red_std"),
@@ -104,85 +114,77 @@ for yr in [1990, 2000, 2010, 2020]:
         max("ndvi").alias("ndvi_max"),
     ).show(truncate=False)
 
-# spliting data into to get trained under two models
-# Legacy model = 1990, 2000, 2010
-legacy_df = df_clean.filter(col("year").isin([1990, 2000, 2010]))
+# training data (but for riverside region only)
+legacy_df = (
+    df_riverside_1990
+    .unionByName(df_riverside_2000)
+    .unionByName(df_riverside_2010)
+)
 
-# 2020 model = 2020 only
-landsat8_df = df_clean.filter(col("year") == 2020)
+landsat8_df = df_riverside_2020
 
-print("=== Legacy Data Row Count (1990/2000/2010) ===")
+print("=== Legacy Data Row Count (Riverside 1990/2000/2010) ===")
 print(legacy_df.count())
 
-print("=== 2020 Data Row Count ===")
+print("=== 2020 Data Row Count (Riverside 2020 only) ===")
 print(landsat8_df.count())
 
 print("=== Legacy Label Distribution ===")
 legacy_df.groupBy("label").count().orderBy("label").show()
 
-print("=== 2020 Label Distribution ===")
+print("=== Riverside 2020 Label Distribution ===")
 landsat8_df.groupBy("label").count().orderBy("label").show()
 
-print("=== Legacy Label Distribution by Year ===")
-legacy_df.groupBy("year", "label").count().orderBy("year", "label").show()
+# balance by downsampling 
+# safer than aggressive oversampling for your case
+def balance_binary_downsample(df_in, label_col="label", seed=42):
+    class0 = df_in.filter(col(label_col) == 0.0)
+    class1 = df_in.filter(col(label_col) == 1.0)
 
-print("=== 2020 Label Distribution by City ===")
-landsat8_df.groupBy("city", "label").count().orderBy("city", "label").show()
-
-# helps balance an imbalanced binary dataset 
-def rebalance_binary(df_in, label_col="label", minority_label=1.0, majority_label=0.0, seed=42):
-    minority_df = df_in.filter(col(label_col) == minority_label)
-    majority_df = df_in.filter(col(label_col) == majority_label)
-
-    # count each class 
-    minority_count = minority_df.count()
-    majority_count = majority_df.count()
+    n0 = class0.count()
+    n1 = class1.count()
 
     print("Current class counts:")
-    print(f"  minority ({minority_label}) = {minority_count}")
-    print(f"  majority ({majority_label}) = {majority_count}")
+    print(f"  class 0 = {n0}")
+    print(f"  class 1 = {n1}")
 
-    # if minority class is smaller, oversample it
-    if minority_count < majority_count:
-        oversample_ratio = majority_count / minority_count
-        minority_oversampled = minority_df.sample(
-            withReplacement=True,
-            fraction=oversample_ratio,
-            seed=seed
-        )
-        balanced_df = majority_df.unionByName(minority_oversampled)
-    else:
-        balanced_df = df_in
+    if n0 == 0 or n1 == 0:
+        print("WARNING: One class is missing. Returning original dataframe.")
+        return df_in
 
-    return balanced_df
+    target_n = builtins.min(n0, n1)
 
-# rebalance legacy data 
-print("=== Rebalancing Legacy Data ===")
-legacy_train_df = rebalance_binary(
-    legacy_df,
-    label_col="label",
-    minority_label=1.0,
-    majority_label=0.0,
-    seed=42
-)
+    if n0 > target_n:
+        frac0 = target_n / n0
+        class0 = class0.sample(withReplacement=False, fraction=frac0, seed=seed)
 
-print("=== Legacy Rebalanced Class Counts ===")
-legacy_train_df.groupBy("label").count().orderBy("label").show()
+    if n1 > target_n:
+        frac1 = target_n / n1
+        class1 = class1.sample(withReplacement=False, fraction=frac1, seed=seed)
 
-# rebalance 2020 data 
-print("=== Rebalancing 2020 Data ===")
-landsat8_train_df = rebalance_binary(
-    landsat8_df,
-    label_col="label",
-    minority_label=1.0,
-    majority_label=0.0,
-    seed=42
-)
+    balanced = class0.unionByName(class1)
+    return balanced
 
-print("=== 2020 Rebalanced Class Counts ===")
-landsat8_train_df.groupBy("label").count().orderBy("label").show()
+# balancing the training sets 
+print("=== Balancing Legacy Data ===")
+legacy_balanced_df = balance_binary_downsample(legacy_df, label_col="label", seed=42)
+legacy_balanced_df.groupBy("label").count().orderBy("label").show()
 
-# train the model 
+print("=== Balancing Riverside 2020 Data ===")
+landsat8_balanced_df = balance_binary_downsample(landsat8_df, label_col="label", seed=42)
+landsat8_balanced_df.groupBy("label").count().orderBy("label").show()
+
+# splitting into training and validation split 
+legacy_train_df, legacy_val_df = legacy_balanced_df.randomSplit([0.8, 0.2], seed=42)
+landsat8_train_df, landsat8_val_df = landsat8_balanced_df.randomSplit([0.8, 0.2], seed=42)
+
+print("=== Legacy train/val counts ===")
+print(legacy_train_df.count(), legacy_val_df.count())
+
+print("=== 2020 train/val counts ===")
+print(landsat8_train_df.count(), landsat8_val_df.count())
+
+# training the random forest model 
 def train_rf_model(train_df, feature_cols, model_path, model_name):
     assembler = VectorAssembler(
         inputCols=feature_cols,
@@ -195,8 +197,9 @@ def train_rf_model(train_df, feature_cols, model_path, model_name):
         predictionCol="prediction",
         probabilityCol="probability",
         rawPredictionCol="rawPrediction",
-        numTrees=100,
-        maxDepth=12,
+        numTrees=80,
+        maxDepth=8,
+        minInstancesPerNode=10,
         seed=42
     )
 
@@ -210,25 +213,68 @@ def train_rf_model(train_df, feature_cols, model_path, model_name):
 
     return model
 
-# training the legacy model
+# evaluate model 
+def evaluate_model(model, eval_df, model_name):
+    preds = model.transform(eval_df)
+
+    evaluator_acc = MulticlassClassificationEvaluator(
+        labelCol="label",
+        predictionCol="prediction",
+        metricName="accuracy"
+    )
+    evaluator_f1 = MulticlassClassificationEvaluator(
+        labelCol="label",
+        predictionCol="prediction",
+        metricName="f1"
+    )
+    evaluator_precision = MulticlassClassificationEvaluator(
+        labelCol="label",
+        predictionCol="prediction",
+        metricName="weightedPrecision"
+    )
+    evaluator_recall = MulticlassClassificationEvaluator(
+        labelCol="label",
+        predictionCol="prediction",
+        metricName="weightedRecall"
+    )
+
+    acc = evaluator_acc.evaluate(preds)
+    f1 = evaluator_f1.evaluate(preds)
+    precision = evaluator_precision.evaluate(preds)
+    recall = evaluator_recall.evaluate(preds)
+    # print results 
+    print(f"=== Validation Metrics: {model_name} ===")
+    print(f"Accuracy           = {acc:.4f}")
+    print(f"F1 Score           = {f1:.4f}")
+    print(f"Weighted Precision = {precision:.4f}")
+    print(f"Weighted Recall    = {recall:.4f}")
+
+    print("=== Confusion-style table ===")
+    preds.groupBy("label", "prediction").count().orderBy("label", "prediction").show()
+
+# train legacy model 
 legacy_model_path = "data/urban_rf_model_legacy"
 legacy_model = train_rf_model(
     legacy_train_df,
     feature_cols,
     legacy_model_path,
-    "Legacy Model (1990/2000/2010)"
+    "Legacy Model (Riverside 1990/2000/2010)"
 )
 
-# training the 2020 model 
+evaluate_model(legacy_model, legacy_val_df, "Legacy Model")
+
+# train 2020 model 
 landsat8_model_path = "data/urban_rf_model_2020"
 landsat8_model = train_rf_model(
     landsat8_train_df,
     feature_cols,
     landsat8_model_path,
-    "2020 Model"
+    "2020 Model (Riverside 2020 only)"
 )
 
-# helper for printing the feature importance 
+evaluate_model(landsat8_model, landsat8_val_df, "2020 Model")
+
+# print feature importance 
 def print_feature_importances(model, feature_cols, model_name):
     rf_model = model.stages[-1]
     importances = rf_model.featureImportances.toArray()
