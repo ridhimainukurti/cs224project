@@ -114,7 +114,6 @@ python scripts/member3/randomForest_testing_composites.py
 
 ## Notes
 
-- There is also a root-level `randomForest_training.py`; prefer `scripts/member3/randomForest_training.py` for the maintained workflow.
 - Run all commands from project root so relative paths resolve correctly.
 
 ## Troubleshooting
